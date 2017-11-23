@@ -1,11 +1,4 @@
-"""
-Helper module to provide activation to network layers.
-Four types of activations with their derivates are available:
-- Sigmoid
-- Softmax
-- Tanh
-- ReLU
-"""
+
 import numpy as np
 
 

@@ -1,162 +1,131 @@
 import os
 import numpy as np
 import random
+import matplotlib.pyplot as plt
+import matplotlib.image as im
 
-from activations import sigmoid, sigmoid_prime
+def sigmoid(z):
+    return 1.0 / (1.0 + np.exp(-z))
+
+def sigmoid_deriv(z):
+    return sigmoid(z) * (1 - sigmoid(z))
 
 
-class NeuralNetwork(object):
+class perceptron(object):
 
-    def __init__(self, sizes=list(), learning_rate=.8, mini_batch_size=16,
-                 epochs=10):
-        """Initialize a Neural Network model.
-        Parameters
-        ----------
-        sizes : list, optional
-            A list of integers specifying number of neurns in each layer. Not
-            required if a pretrained model is used.
-        learning_rate : float, optional
-            Learning rate for gradient descent optimization. Defaults to 1.0
-        mini_batch_size : int, optional
-            Size of each mini batch of training examples as used by Stochastic
-            Gradient Descent. Denotes after how many examples the weights
-            and biases would be updated. Default size is 16.
-        """
-        # Input layer is layer 0, followed by hidden layers layer 1, 2, 3...
-        self.sizes = sizes	
+    def __init__(self, sizes=list(), learning_rate=.8, mini_batch_size=16,epochs=10):
+        self.sizes = sizes
         self.num_layers = len(sizes)
-
-        # First term corresponds to layer 0 (input layer). No weights enter the
-        # input layer and hence self.weights[0] is redundant.
         self.weights = [np.array([0])] + [np.random.randn(y, x) for y, x in
                                           zip(sizes[1:], sizes[:-1])]
-
-        # Input layer does not have any biases. self.biases[0] is redundant.
         self.biases = [np.random.randn(y, 1) for y in sizes]
 
-        # Input layer has no weights, biases associated. Hence z = wx + b is not
-        # defined for input layer. self.zs[0] is redundant.
-        self._zs = [np.zeros(bias.shape) for bias in self.biases]
+        self._zs = [np.zeros(bias.shape) for bias in self.biases]ch 72, accuracy 53.32 %.
 
-        # Training examples can be treated as activations coming out of input
-        # layer. Hence self.activations[0] = (training_example).
         self._activations = [np.zeros(bias.shape) for bias in self.biases]
 
         self.mini_batch_size = mini_batch_size
         self.epochs = epochs
         self.eta = learning_rate
+        self.error_list=[]
+        self.accuracy_list=[]
 
     def fit(self, training_data, validation_data=None):
-        """Fit (train) the Neural Network on provided training data. Fitting is
-        carried out using Stochastic Gradient Descent Algorithm.
-        Parameters
-        """
         for epoch in range(self.epochs):
             random.shuffle(training_data)
             mini_batches = [
                 training_data[k:k + self.mini_batch_size] for k in
                 range(0, len(training_data), self.mini_batch_size)]
-
+            b_error=[]
             for mini_batch in mini_batches:
                 nabla_b = [np.zeros(bias.shape) for bias in self.biases]
                 nabla_w = [np.zeros(weight.shape) for weight in self.weights]
+                
                 for x, y in mini_batch:
-                    self._forward_prop(x)
-                    delta_nabla_b, delta_nabla_w = self._back_prop(x, y)
+                    self.forward_prop(x)
+                    err_i=[]
+                    delta_nabla_b, delta_nabla_w,err_i = self.back_prop(x, y,err_i)
                     nabla_b = [nb + dnb for nb, dnb in zip(nabla_b, delta_nabla_b)]
                     nabla_w = [nw + dnw for nw, dnw in zip(nabla_w, delta_nabla_w)]
-
+                b_error.append(self.error_LMS(err_i))
                 self.weights = [
                     w - (self.eta / self.mini_batch_size) * dw for w, dw in
                     zip(self.weights, nabla_w)]
                 self.biases = [
                     b - (self.eta / self.mini_batch_size) * db for b, db in
                     zip(self.biases, nabla_b)]
-
+            self.error_list.append(self.error_LMS(b_error))
             if validation_data:
                 accuracy = self.validate(validation_data) / 100.0
+                self.accuracy_list.append(accuracy)
                 print("Epoch {0}, accuracy {1} %.".format(epoch + 1, accuracy))
             else:
                 print("Processed epoch {0}.".format(epoch))
 
     def validate(self, validation_data):
-        """Validate the Neural Network on provided validation data. It uses the
-        number of correctly predicted examples as validation accuracy metric.
-        Parameters
-        ----------
-        validation_data : list of tuple
-        Returns
-        -------
-        int
-            Number of correctly predicted images.
-        """
         validation_results = [(self.predict(x) == y) for x, y in validation_data]
-        return sum(result for result in validation_results)
-
+        return sum(result for result in validation_results)        
     def predict(self, x):
-        """Predict the label of a single test example (image).
-        Parameters
-        ----------
-        x : numpy.array
-        Returns
-        -------
-        int
-            Predicted label of example (image).
-        """
-
-        self._forward_prop(x)
+        self.forward_prop(x)
         return np.argmax(self._activations[-1])
+    def predict_file(self,pathh):
+        img=im.imread(pathh)
+        img=img.reshape(28*28,1)
+        return self.predict(img)
 
-    def _forward_prop(self, x):
+    def forward_prop(self, x):
         self._activations[0] = x
         for i in range(1, self.num_layers):
             self._zs[i] = (
                 self.weights[i].dot(self._activations[i - 1]) + self.biases[i]
             )
             self._activations[i] = sigmoid(self._zs[i])
+    def plot_error(self):
+        plt.plot(self.error_list)
+        plt.show()
 
+    def plot_accuracy(self):
+        plt.plot(self.accuracy_list)
+        plt.show()
+        
+    def error_LMS(self,a):
+        return 0.5*np.sum(np.power((a),2))/len(a)
 
-    def _back_prop(self, x, y):
+    def back_prop(self, x, y,err_l):
         nabla_b = [np.zeros(bias.shape) for bias in self.biases]
         nabla_w = [np.zeros(weight.shape) for weight in self.weights]
 
-        error = (self._activations[-1] - y) * sigmoid_prime(self._zs[-1])
+        error = (self._activations[-1] - y) * sigmoid_deriv(self._zs[-1])
+        err_l.append(self.error_LMS(self._activations[-1] - y))
         nabla_b[-1] = error
         nabla_w[-1] = error.dot(self._activations[-2].transpose())
 
         for l in range(self.num_layers - 2, 0, -1):
             error = np.multiply(
                 self.weights[l + 1].transpose().dot(error),
-                sigmoid_prime(self._zs[l])
+                sigmoid_deriv(self._zs[l])
             )
             nabla_b[l] = error
             nabla_w[l] = error.dot(self._activations[l - 1].transpose())
 
-        return nabla_b, nabla_w
+        return nabla_b, nabla_w,err_l
 
-    #load weights, biases and hyperparameters of neural network
     def load(self, filename='model.npz'):
         npz_members = np.load(os.path.join(os.curdir, 'models', filename))
 
         self.weights = list(npz_members['weights'])
         self.biases = list(npz_members['biases'])
 
-        # Bias vectors of each layer has same length as the number of neurons
-        # in that layer. So we can build `sizes` through biases vectors.
         self.sizes = [b.shape[0] for b in self.biases]
         self.num_layers = len(self.sizes)
 
-        # These are declared as per desired shape.
         self._zs = [np.zeros(bias.shape) for bias in self.biases]
         self._activations = [np.zeros(bias.shape) for bias in self.biases]
 
-        # Other hyperparameters are set as specified in model. These were cast
-        # to numpy arrays for saving in the compressed binary.
         self.mini_batch_size = int(npz_members['mini_batch_size'])
         self.epochs = int(npz_members['epochs'])
         self.eta = float(npz_members['eta'])
-    
-    #Save weights, biases and hyperparameters of neural network
+
     def save(self, filename='model.npz'):
 
         np.savez_compressed(

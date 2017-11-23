@@ -56,9 +56,11 @@ def get_data(path,folder,validation_set=100):
 	train=[]
 	valid=[]
 	n=0
+	k=0
 	for i in os.listdir():
 		t=os.getcwd()
 		os.chdir(i)
+		print(str(k)+" Processing Class "+str(i))
 		for j in os.listdir():
 			n+=1
 			img=im.imread(j)
@@ -68,9 +70,14 @@ def get_data(path,folder,validation_set=100):
 			 valid.append((img,int(i))) 
 
 		os.chdir(t)
+		k+=1
 	os.chdir(p)
 	a=pickle.dumps(train)	
-	fil=open(folder,'wb')
+	fil=open(folder+'_train','wb')
+	fil.write(a)
+	fil.close()
+	a=pickle.dumps(valid)	
+	fil=open(folder+'_valid','wb')
 	fil.write(a)
 	fil.close()
 	return train,valid
